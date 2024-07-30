@@ -8,7 +8,7 @@ When designing a spectrometer for astronomical applications, it's important to c
 ## Setup ##
 
 This tutorial comes with a completed model file, 
-a compiled bitstream, ready for execution on ROACH, as well as a Python script to configure the ROACH and make plots. [Here](https://github.com/casper-astro/tutorials_devel/tree/master/ise/roach2/tut_spec)
+a compiled bitstream, ready for execution on the SNAP board, as well as a Python script to configure the SNAP board and make plots. [Here](https://github.com/casper-astro/tutorials_devel/tree/main/snap/tut_spec)
 
 ## Spectrometer Basics ##
 
@@ -69,7 +69,7 @@ The ADC block converts analog inputs to digital outputs. Every clock cycle, the 
 
 ADCs often internally bias themselves to halfway between 0 and -1. This means that you'd typically see the output of an ADC toggling between zero and -1 when there's no input. It also means that unless otherwise calibrated, an ADC will have a negative DC offset.
 
-The ADC has to be clocked to four times that of the FPGA clock. In this design the ADC is clocked to 800MHz, so the ROACH will be clocked to 200MHz . This gives us a bandwidth of 400MHz, as Nyquist sampling requires two samples (or more) each second.
+The ADC has to be clocked to four times that of the FPGA clock. In this design the ADC is clocked to 800MHz, so the SNAP board will be clocked to 200MHz . This gives us a bandwidth of 400MHz, as Nyquist sampling requires two samples (or more) each second.
 
 **INPUTS**
 
@@ -109,7 +109,7 @@ As the ADC has four parallel time sampled outputs: i0, i1, i2 and i3, we need fo
 | Number of Simultaneous Inputs (2?)       | The number of parallel time samples which are presented to the FFT core each clock. The number of output ports are set to this same value. We have four inputs from the ADC, so set this to 2.                                                                                                               |
 | Make biplex                              | 0 (not making it biplex) is default. Double up the inputs to match with a biplex FFT.                                                                                                                                                                                                                        |
 | Input bitwidth.                          | The number of bits in each real and imaginary sample input to the PFB. The ADC outputs 8.7 bit data, so the input bitwidth should be set to 8 in our design.                                                                                                                                                 |
-| Output bitwidth                          | The number of bits in each real and imaginary sample output from the PFB. This should match the bit width in the FFT that follows. 18 bits is recommended for the ROACH (18x25 multipliers) and iBOB/BEE2 (18x18 multipliers).                                                                               |
+| Output bitwidth                          | The number of bits in each real and imaginary sample output from the PFB. This should match the bit width in the FFT that follows. 18 bits is recommended for the SNAP board (18x25 multipliers) and iBOB/BEE2 (18x18 multipliers).                                                                               |
 | Coefficient bitwidth                     | The number of bits in each coefficient. This is usually chosen to be less than or equal to the input bit width.                                                                                                                                                                                              |
 | Use dist mem for coeffients              | Store the FIR coefficients in distributed memory (if = 1). Otherwise, BRAMs are used to hold the coefficients. 0 (not using distributed memory) is default                                                                                                                                                   |
 | Add/Mult/BRAM/Convert Latency            | These values set the number of clock cycles taken by various processes in the filter. There's normally no reason to change this unless you're having troubles fitting the design into the fabric.                                                                                                            |
@@ -151,7 +151,7 @@ Parts of the documentation below are taken from the [[Block_Documentation | bloc
 | Convert Latency | Latency through blocks used to reduce bit widths after twiddle and butterfly stages. Set this to 1. |
 | Input Latency | Here you can register your input data streams in case you run into timing issues. Leave this set to 0. |
 | Latency between biplexes and fft_direct | Here you can add optional register stages between the two major processing blocks in the FFT. These can help a failing design meet timing. For this tutorial, you should be able to compile the design with this parameter set to 0. |
-| Architecture | Set to Virtex5, the architecture of the FPGA on the ROACH. This changes some of the internal logic to better optimise for the DSP slices. If you were using an older iBOB board, you would need to set this to Virtex2Pro. |
+| Architecture | Set to Kintex 7, the architecture of the FPGA on the SNAP. This changes some of the internal logic to better optimise for the DSP slices. If you were using an older iBOB board, you would need to set this to Virtex2Pro. |
 | Use less | This affects the implementation of complex multiplication in the FFT, so that they either use fewer multipliers or less logic/adders. For the complex multipliers in the FFT, you can use 4 multipliers and 2 adders, or 3 multipliers and a bunch or adders. So you can trade-off DSP slices for logic or vice-versa. Set this to Multipliers. |
 | Number of bits above which to store stage's coefficients in BRAM | Determines the threshold at which the twiddle coefficients in a stage are stored in BRAM. Below this threshold distributed RAM is used. By changing this, you can bias your design to use more BRAM or more logic. We're going to set this to 8. |
 | Number of bits above which to store stage's delays in BRAM | Determines the threshold at which the twiddle coefficients in a stage are stored in BRAM. Below this threshold distributed RAM is used. Set this to 9. |
@@ -260,7 +260,7 @@ There are a few [control registers](https://casper.berkeley.edu/wiki/Software_re
 
 - **acc_cnt**: Accumulation counter. Keeps track of how many accumulations have been done.
 
-- **led0_sync**: Back on topic: the led0_sync light flashes each time a sync pulse is generated. It lets you know your ROACH is alive.
+- **led0_sync**: Back on topic: the led0_sync light flashes each time a sync pulse is generated. It lets you know your SNAP board is alive.
 
 - **led1_new_acc**: This lights up led1 each time a new accumulation is triggered.
 
@@ -293,7 +293,7 @@ If you're in linux, browse to where the snap_tut_spec.py file is in a terminal a
  ./snap_tut_spec.py <SNAP IP or hostname> -b <fpgfile name>
 ```
 
-replacing <roach IP or hostname> with the IP address of your SNAP and <fpgfile name> with your fpgfile. You should see a spectrum like this:
+replacing <snap IP or hostname> with the IP address of your SNAP and <fpgfile name> with your fpgfile. You should see a spectrum like this:
 
 ![](../../_static/img/tut_spec/Spectrometer.py_4.8.png)
 
@@ -320,13 +320,13 @@ Next, we set a few variables:
 katcp_port = 7147
 ```
 
-Which we can then use in FpgaClient() such that we can connect to the ROACH and issue commands to the FPGA:
+Which we can then use in FpgaClient() such that we can connect to the SNAP board and issue commands to the FPGA:
 
 ```python
 fpga = casperfpga.CasperFpga(snap)
 ```
 
-We now have an fpga object to play around with. To check if you managed to connect to your ROACH, type:
+We now have an fpga object to play around with. To check if you managed to connect to your SNAP board, type:
 
 ```python	
 fpga.is_connected()
@@ -401,7 +401,7 @@ To make a connection to the SNAP, we need to know what port to connect to, and t
 fpga = casperfpga.CasperFpga(snap)
 ```
 
-The katcp_port variable is set on line 13, and the roach variable is passed to the script at the terminal (remember that you typed python snap_tut_spec.py roachname). We can check if the connection worked by using fpga.is_connected(), which returns true or false:
+The katcp_port variable is set on line 13, and the snap variable is passed to the script at the terminal (remember that you typed python snap_tut_spec.py snapname). We can check if the connection worked by using fpga.is_connected(), which returns true or false:
 
 ```python
 if fpga.is_connected():
@@ -429,7 +429,7 @@ from optparse import OptionParser
 
 
 p = OptionParser()
-p.set_usage('spectrometer.py <ROACH_HOSTNAME_or_IP> [options]')
+p.set_usage('spectrometer.py <SNAP_HOSTNAME_or_IP> [options]')
 p.set_description(__doc__)
 p.add_option('-l', '--acc_len', dest='acc_len', type='int',default=2*(2**28)/2048,
     help='Set the number of vectors to accumulate between dumps. default is 2*(2^28)/2048, or just under 2 seconds.')
